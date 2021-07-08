@@ -59,6 +59,15 @@ contract Hacker {
 - v0.8.6 🙌
 ![image](https://user-images.githubusercontent.com/78368735/124986625-d5217800-e009-11eb-8b91-88cfe002b6ae.png)
 
+### Deny
+
+To win this game we have to prevent the owner from withdrawing funds. Before funds get transferred to owner there is `partner.call.value(amountToSend)();`, which we can exploit. Since no gas amount has been specified, all gas will be sent to the `fallback` function of the partner address.
+
+We can write a contract with a `fallback` function that will trigger `assert` and thus spend all gas, making it so that the owner can't withdraw.
+
+**Re-entrancy attack doesn't work for the game**
+
+The goal is to make the `withdraw` call fail. We control the `partner` contract. The contract writer’s idea was that even if we revert in our contract using `revert` / `require` only our function call would fail but the withdrawal to the original owner would still continue. While this is true, notice that our function is being called using `.call` without specifying an explicit gas limit. We can just consume all available gas in the transaction resulting in the caller function to be out of gas and fail. Contrary to `revert` and `require`, the `assert` instruction consumes all gas.
 
 ## Source Code
 
