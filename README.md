@@ -1,39 +1,64 @@
-# Solidity Game - [Game Title] Attack
+# Solidity Game - Denial
 
-_Inspired by OpenZeppelin's [Ethernaut](https://ethernaut.openzeppelin.com), [Game Title] Level_
+_Inspired by OpenZeppelin's [Ethernaut](https://ethernaut.openzeppelin.com), Denial Level_
 
 ⚠️Do not try on mainnet!
 
 ## Task
 
-Hacker the basic token contract below.
+This is a simple wallet that drips funds over time. You can withdraw the funds slowly by becoming a withdrawing partner.
 
-1. You are given 20 tokens to start with and you will beat the game if you somehow manage to get your hands on any additional tokens. Preferably a very large amount of tokens.
+If you can deny the owner from withdrawing funds when they call `withdraw()` (whilst the contract still has funds) you will win this game.
 
-_Hint:_
-
-1. What is an odometer?
 
 ## What will you learn?
 
-1. Solidity Security Consideration
-2. **Underflow** and **Overflow** in use of unsigned integers
+1. `call` vs `transfer`
+2. `assert` vs `require`
+
+### `transfer` vs `call`
+
+The `transfer` function fails if the balance of the current contract is not large enough or if the Ether transfer is rejected by the receiving account. The `transfer` function reverts on failure.
+
+You should avoid using `.call()` whenever possible when executing another contract function as it bypasses type checking, function existence check, and argument packing.
+`call` is low-level functions and should be used with care. Specifically, any unknown contract might be malicious and if you call it, you hand over control to that contract which could in turn call back into your contract, so be prepared for changes to your state variables when the call returns.
+
+### `assert` vs `require`
+
+with `assert`, you would lose the entire amount (or close to it). `assert` is effectively the catastrophic bail out of the transaction due to something completely unexpected. It should be used to check for things like making sure your contract hasn't wound up in an invalid state, avoid divide by 0, over/underflow, etc.
+
+`require`, on the other hand, will only consume the gas used up to the point of failure. The remaining gas will be refunded.
+
+Basically, `assert` is just there to prevent anything really bad from happening, but it shouldn't be possible for the condition to evaluate to false.
 
 ## What is the most difficult challenge?
 
-**You won't get success to attack if the target contract has been complied in Solidity 0.8.0 or uppper** 🤔
+### `assert` now uses `REVERT` opcode
 
-> [**Solidity v0.8.0 Breaking Changes**](https://docs.soliditylang.org/en/v0.8.5/080-breaking-changes.html?highlight=underflow#silent-changes-of-the-semantics)
->
-> Arithmetic operations revert on **underflow** and **overflow**. You can use `unchecked { ... }` to use the previous wrapping behaviour.
->
-> Checks for overflow are very common, so we made them the default to increase readability of code, even if it comes at a slight increase of gas costs.
+That means, `assert` doesn't consume the entire available gas any more, since Solidity v0.8.0 😜
 
-I had tried to do everything in Solidity 0.8.5 at first time, but it didn't work, as it reverted transactions everytime it met underflow.
+Before v0.8.0, `assert` complied to an `INVALID` (`0xFE`) opcode which drains out the gas. But now, `assert` and `require` are converted to the same opcode `0xFD` which is `REVERT`
 
-Finally, I found that Solidity included those checks by defaults while using sliencely more gas.
+Let's make a experiment. You are going to send some ether to the contract, of course it will fail, but we are going to test gas used by `assert` in different versions.
 
-So, don't you need to use [`SafeMath`](https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/SafeMath.sol)?
+```solidity
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.6.0;
+
+contract Hacker {
+    fallback() external payable {
+        assert(false);
+    }
+}
+```
+
+- v0.6.12
+![image](https://user-images.githubusercontent.com/78368735/124986696-e8344800-e009-11eb-8447-bc247b69c79d.png)
+
+
+- v0.8.6 🙌
+![image](https://user-images.githubusercontent.com/78368735/124986625-d5217800-e009-11eb-8b91-88cfe002b6ae.png)
+
 
 ## Source Code
 
